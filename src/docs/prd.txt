@@ -1,0 +1,259 @@
+PRD — AI Image Generation & Editing Tool
+1. Product Overview
+Product Name (working)
+
+AI Image Studio (temporary name)
+
+Vision
+
+Build a simple, fast AI tool that allows users to:
+
+Generate images from text prompts
+Preview results instantly
+Download generated images
+Edit generated images using text instructions
+Upload images and modify them with AI
+
+The goal is to make image creation and editing as simple as typing a sentence.
+
+2. Problem Statement
+
+Creating high-quality images today requires:
+
+design skills (Photoshop, Figma)
+time
+technical knowledge
+
+Existing AI tools are often:
+
+too complex
+overloaded with features
+slow or expensive
+not optimized for iterative editing
+3. Target Users
+Primary Users
+Content creators
+Indie founders
+Designers
+Social media managers
+Developers building MVPs
+Marketing teams
+Secondary Users
+Students
+Freelancers
+Non-designers needing visuals quickly
+4. Core Use Cases
+1. Text → Image Generation
+
+User types:
+
+“A futuristic city at sunset with flying cars”
+
+System generates image.
+
+2. Image Download
+
+User can:
+
+preview image
+download PNG/JPG
+3. Image Editing (Generated Image)
+
+User modifies generated image:
+
+“Make the sky darker”
+“Change the car color to red”
+“Add neon lights”
+
+4. Image Upload → Edit
+
+User uploads an image:
+
+AI modifies based on prompt
+
+Example:
+
+remove background
+change style
+add object
+enhance quality
+5. Frontend Scope (MVP Focus)
+5.1 Pages
+1. Landing Page
+
+Goal: explain product simply
+
+Sections:
+
+Hero: “Generate and edit images with AI”
+Input preview demo
+CTA button: “Start creating”
+Example gallery
+2. Main Generator Page (Core Page)
+
+This is the most important page.
+
+Layout:
+
+A. Prompt Input Section
+Large text input box
+
+Placeholder:
+
+“Describe the image you want to create…”
+
+Button:
+“Generate Image”
+B. Image Preview Section
+
+After generation:
+
+show generated image
+loading state (skeleton or spinner)
+
+Actions:
+
+Download button
+“Edit Image” button
+“Regenerate” button
+C. Edit Mode Section
+
+Activated after image generation or upload:
+
+Input:
+
+“Describe the change you want”
+
+Examples:
+
+“Make it night”
+“Turn it into anime style”
+“Add a mountain in the background”
+
+Button:
+
+“Apply Changes”
+D. Upload Section
+
+User can drag & drop image:
+
+upload box
+preview uploaded image
+then apply AI edits
+5.2 UI Components
+Prompt Box
+multi-line textarea
+auto-resize
+history dropdown (future feature)
+Image Viewer
+responsive image container
+zoom on click (optional)
+before/after toggle (future enhancement)
+Action Buttons
+Generate
+Edit
+Download
+Regenerate
+Loading States
+skeleton image placeholder
+“Generating image…” text
+animated progress indicator
+5.3 UX Flow
+Flow 1: Generate Image
+User enters prompt
+Click “Generate”
+Image appears
+User downloads or edits
+Flow 2: Edit Generated Image
+User generates image
+Clicks “Edit”
+Enters instruction
+AI updates image
+New version displayed
+Flow 3: Upload + Edit
+Upload image
+Enter modification prompt
+AI modifies image
+Result displayed
+6. Design Principles
+Minimal UI (like a creative tool, not a dashboard)
+Fast interaction (no friction)
+Focus on image preview
+Mobile-friendly but desktop-first
+“Single canvas experience” (everything happens on one page)
+7. Technical Overview (Frontend Perspective)
+Stack
+Next.js (App Router)
+React
+Tailwind CSS
+Zustand or React state (light state management)
+API Integration (Frontend → Backend)
+
+Frontend calls Next.js API routes:
+
+1. Generate Image
+POST /api/generate
+
+Payload:
+
+{
+  "prompt": "string"
+}
+2. Edit Image
+POST /api/edit
+
+Payload:
+
+{
+  "imageUrl": "string",
+  "prompt": "string"
+}
+3. Upload Image
+
+Handled via:
+
+file upload → stored (S3 / local / blob storage)
+returns URL
+8. Backend Dependency (for context)
+
+Backend will later use:
+
+ChatGPT for prompt enhancement / content structuring
+AI image model (DALL·E / Stable Diffusion / similar)
+Next.js API routes as orchestration layer
+
+Frontend should not depend on implementation details.
+
+9. MVP Scope
+Must Have
+Text → image generation
+Image preview
+Download image
+Basic edit prompt system
+Image upload
+Nice to Have (later)
+generation history
+prompt suggestions (ChatGPT-powered)
+style presets
+before/after slider
+multi-image generation
+canvas editor
+10. Success Metrics
+Time to first image < 30 seconds
+% users generating at least 1 image
+% users using edit feature
+downloads per session
+return rate
+11. Key Product Insight
+
+The real product is not “image generation”.
+
+It is:
+
+fast iteration of visual ideas using natural language
+
+So the frontend must feel like:
+
+a conversation
+a creative loop
+not a form submission tool
