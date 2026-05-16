@@ -71,6 +71,8 @@ export async function POST(request: NextRequest) {
 
     upstreamFormData.append("image", imageFile, imageFile.name);
 
+    console.log(upstreamFormData)
+
     const response = await fetch(getImageApiUrl("edit", settings.model), {
       method: "POST",
       headers: {
@@ -78,6 +80,7 @@ export async function POST(request: NextRequest) {
       },
       body: upstreamFormData,
     });
+    console.log(response)
 
     if (!response.ok) {
       const errorText = await response.text();

@@ -49,6 +49,8 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify(requestBody),
     });
 
+    console.log(response)
+
     if (!response.ok) {
       const error = await response.json();
       console.error("API Error:", error);

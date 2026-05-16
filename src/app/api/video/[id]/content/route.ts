@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const resolvedParams = await params;
     const authHeader = request.headers.get("authorization");
     const apiKey = authHeader
       ? authHeader.replace("Bearer ", "").trim()
@@ -14,16 +15,19 @@ export async function GET(
       process.env.IMAGE_API_BASE_URL?.replace(/\/$/, "") ||
       "https://build.lewisnote.com";
 
-    const response = await fetch(`${baseUrl}/v1/videos/${params.id}/content`, {
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
+    const response = await fetch(
+      `${baseUrl}/v1/videos/${resolvedParams.id}/content`,
+      {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+        },
       },
-    });
+    );
 
     if (!response.ok) {
       return NextResponse.json(
         { error: "Failed to retrieve video content URL" },
-        { status: response.status }
+        { status: response.status },
       );
     }
 
@@ -33,7 +37,7 @@ export async function GET(
     console.error("Server Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

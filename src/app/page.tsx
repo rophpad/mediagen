@@ -19,6 +19,7 @@ interface MediaState {
   loading: boolean;
   originalPrompt: string;
   error: string | null;
+  progress?: number; // New field for video generation progress
 }
 
 function createInitialMediaState(): MediaState {
@@ -27,6 +28,7 @@ function createInitialMediaState(): MediaState {
     loading: false,
     originalPrompt: "",
     error: null,
+    progress: 0,
   };
 }
 
@@ -192,9 +194,15 @@ export default function MediaGenerator() {
   };
 
   const requestGenerateVideo = async (nextPrompt: string) => {
-    setVideoState((prev) => ({ ...prev, loading: true, error: null }));
+    setVideoState((prev) => ({
+      ...prev,
+      loading: true,
+      error: null,
+      progress: 0,
+    }));
 
     try {
+      // Step 1: Initiate video generation
       const initResponse = await fetch("/api/generate-video", {
         method: "POST",
         headers: {
@@ -221,12 +229,13 @@ export default function MediaGenerator() {
         throw new Error("No video ID returned");
       }
 
-      // Poll for completion
+      // Step 2: Poll for completion on client-side
       let status = initData.status;
-      let attempts = 0;
+      let progress = initData.progress || 0;
       const maxAttempts = 60; // Up to 5 minutes at 5s intervals
+      let attempts = 0;
 
-      while (status !== "succeeded" && attempts < maxAttempts) {
+      while (status !== "completed" && attempts < maxAttempts) {
         await new Promise((resolve) => setTimeout(resolve, 5000));
         attempts++;
 
@@ -236,21 +245,27 @@ export default function MediaGenerator() {
           },
         });
 
-        if (!statusResponse.ok) continue;
+        if (!statusResponse.ok) {
+          setVideoState((prev) => ({ ...prev, progress: 0 })); // Reset progress on error
+          continue;
+        }
 
         const statusData = await statusResponse.json();
         status = statusData.status;
+        progress = statusData.progress || progress; // Update progress, keep previous if not available
+
+        setVideoState((prev) => ({ ...prev, progress }));
 
         if (status === "failed") {
           throw new Error("Video generation failed during processing");
         }
       }
 
-      if (status !== "succeeded") {
+      if (status !== "completed") {
         throw new Error("Video generation timed out");
       }
 
-      // Get final content URL
+      // Step 3: Get final content URL
       const contentResponse = await fetch(`/api/video/${videoId}/content`, {
         headers: {
           ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
@@ -273,6 +288,7 @@ export default function MediaGenerator() {
         loading: false,
         originalPrompt: nextPrompt,
         error: null,
+        progress: 100, // Set to 100% on success
       });
     } catch (error) {
       console.error("Video generation failed:", error);
@@ -283,6 +299,7 @@ export default function MediaGenerator() {
           error instanceof Error
             ? error.message
             : "Video generation failed. Check your API configuration and try again.",
+        progress: 0, // Reset progress on error
       }));
     }
   };
@@ -504,8 +521,29 @@ export default function MediaGenerator() {
                 <div className="mt-6 rounded-lg border border-slate-200 bg-white p-4">
                   {currentState.loading ? (
                     <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
-                      <RefreshCw className="h-6 w-6 animate-spin text-slate-400" />
-                      <p className="text-sm text-slate-500">{loadingLabel}</p>
+                      {isVideoTool ? (
+                        <div className="w-full px-4">
+                          <p className="mb-2 text-sm text-slate-500">
+                            Generating video...
+                          </p>
+                          <div className="h-2 w-full rounded-full bg-slate-200">
+                            <div
+                              className="h-full rounded-full bg-slate-900 transition-all duration-300 ease-out"
+                              style={{ width: `${currentState.progress}%` }}
+                            ></div>
+                          </div>
+                          <p className="mt-2 text-xs text-slate-500">
+                            {currentState?.progress?.toFixed(0)}%
+                          </p>
+                        </div>
+                      ) : (
+                        <>
+                          <RefreshCw className="h-6 w-6 animate-spin text-slate-400" />
+                          <p className="text-sm text-slate-500">
+                            {loadingLabel}
+                          </p>
+                        </>
+                      )}
                     </div>
                   ) : (
                     <>

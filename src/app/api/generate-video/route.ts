@@ -36,8 +36,8 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({
         model: "sora-2",
         prompt,
-        size: settings.size,
-        seconds: Number(settings.duration) || 8,
+        // size: settings.size,
+        seconds: 8,
       }),
     });
 
@@ -49,6 +49,8 @@ export async function POST(request: NextRequest) {
         { status: 500 },
       );
     }
+
+    console.log(response);
 
     const initialData = await response.json();
     return NextResponse.json(initialData); // Returns { id: "video_xyz789", status: "processing" }
