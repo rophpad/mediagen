@@ -1,76 +1,75 @@
 "use client";
 
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
-import {
-  Download,
-  Edit2,
-  RefreshCw,
-  Settings2,
-  Upload,
-  X,
-} from "lucide-react";
+import { Download, Edit2, RefreshCw, Settings2, Upload } from "lucide-react";
+
+import { Sidebar, type MediaTool } from "@/components/Sidebar";
+import { SettingsModal } from "@/components/SettingsModal";
+import { Header } from "@/components/Header";
 
 import {
   DEFAULT_IMAGE_SETTINGS,
-  IMAGE_QUALITIES,
-  IMAGE_MODELS,
-  IMAGE_SIZES,
+  DEFAULT_VIDEO_SETTINGS,
   type ImageGenerationSettings,
+  type VideoGenerationSettings,
 } from "@/lib/image-settings";
 
-interface ImageState {
+interface MediaState {
   url: string | null;
   loading: boolean;
   originalPrompt: string;
+  error: string | null;
+  progress?: number; // New field for video generation progress
 }
 
-type SelectOption<T extends string> = {
-  value: T;
-  label: string;
-};
-
-function SelectField<T extends string>({
-  label,
-  options,
-  value,
-  onChange,
-}: {
-  label: string;
-  options: readonly SelectOption<T>[];
-  value: T;
-  onChange: (value: T) => void;
-}) {
-  return (
-    <label className="block space-y-2">
-      <span className="text-sm font-medium text-slate-900">{label}</span>
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value as T)}
-        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-900/10"
-      >
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-export default function AIImageGenerator() {
-  const [imageState, setImageState] = useState<ImageState>({
+function createInitialMediaState(): MediaState {
+  return {
     url: null,
     loading: false,
     originalPrompt: "",
-  });
-  const [prompt, setPrompt] = useState("");
-  const [settings, setSettings] = useState<ImageGenerationSettings>(
+    error: null,
+    progress: 0,
+  };
+}
+
+export default function MediaGenerator() {
+  const [apiKey, setApiKey] = useState("");
+
+  useEffect(() => {
+    // Only access localStorage after initial render to avoid hydration mismatch
+    const storedKey = window.localStorage.getItem("mediagen_api_key");
+    if (storedKey) {
+      // Defer the state update to avoid synchronous setState inside effect warnings
+      setTimeout(() => {
+        setApiKey(storedKey);
+      }, 0);
+    }
+  }, []);
+
+  const [activeTool, setActiveTool] = useState<MediaTool>("image");
+  const [activeTemplate, setActiveTemplate] = useState<string | null>(null);
+  const [imageState, setImageState] = useState<MediaState>(
+    createInitialMediaState,
+  );
+  const [videoState, setVideoState] = useState<MediaState>(
+    createInitialMediaState,
+  );
+  const [imagePrompt, setImagePrompt] = useState("");
+  const [videoPrompt, setVideoPrompt] = useState("");
+  const [imageSettings, setImageSettings] = useState<ImageGenerationSettings>(
     DEFAULT_IMAGE_SETTINGS,
+  );
+  const [videoSettings, setVideoSettings] = useState<VideoGenerationSettings>(
+    DEFAULT_VIDEO_SETTINGS,
   );
   const [editSourceUrl, setEditSourceUrl] = useState<string | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleApiKeyChange = (key: string) => {
+    setApiKey(key);
+    window.localStorage.setItem("mediagen_api_key", key);
+  };
 
   useEffect(() => {
     if (!isSettingsOpen) return;
@@ -91,9 +90,6 @@ export default function AIImageGenerator() {
     };
   }, [isSettingsOpen]);
 
-  const buildMockImageUrl = () =>
-    `https://images.unsplash.com/photo-1579783902614-e3fb5141b0cb?w=800&q=80&t=${Date.now()}`;
-
   const imageFileFromUrl = async (url: string) => {
     const response = await fetch(url);
 
@@ -109,15 +105,18 @@ export default function AIImageGenerator() {
   };
 
   const requestGenerateImage = async (nextPrompt: string) => {
-    setImageState((prev) => ({ ...prev, loading: true }));
+    setImageState((prev) => ({ ...prev, loading: true, error: null }));
 
     try {
       const response = await fetch("/api/generate-image", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+        },
         body: JSON.stringify({
           prompt: nextPrompt,
-          settings,
+          settings: imageSettings,
         }),
       });
 
@@ -129,21 +128,23 @@ export default function AIImageGenerator() {
         url: data.url,
         loading: false,
         originalPrompt: nextPrompt,
+        error: null,
       });
       setEditSourceUrl(null);
     } catch (error) {
-      console.error("Error:", error);
-      setImageState({
-        url: buildMockImageUrl(),
+      console.error("Image generation failed:", error);
+      setImageState((prev) => ({
+        ...prev,
         loading: false,
-        originalPrompt: nextPrompt,
-      });
+        error:
+          "Image generation failed. Check your API configuration and try again.",
+      }));
       setEditSourceUrl(null);
     }
   };
 
   const requestEditImage = async (nextPrompt: string, sourceUrl: string) => {
-    setImageState((prev) => ({ ...prev, loading: true }));
+    setImageState((prev) => ({ ...prev, loading: true, error: null }));
 
     try {
       const formData = new FormData();
@@ -156,12 +157,18 @@ export default function AIImageGenerator() {
       }
 
       formData.append("prompt", nextPrompt);
-      formData.append("model", settings.model);
-      formData.append("size", settings.size);
-      formData.append("quality", settings.quality);
+      formData.append("model", imageSettings.model);
+      formData.append("size", imageSettings.size);
+      formData.append("quality", imageSettings.quality);
+
+      const headers: HeadersInit = {};
+      if (apiKey) {
+        headers["Authorization"] = `Bearer ${apiKey}`;
+      }
 
       const response = await fetch("/api/edit-image", {
         method: "POST",
+        headers,
         body: formData,
       });
 
@@ -174,21 +181,158 @@ export default function AIImageGenerator() {
         url: data.url,
         loading: false,
         originalPrompt: nextPrompt,
+        error: null,
       });
     } catch (error) {
-      console.error("Error:", error);
-      const fallbackUrl = buildMockImageUrl();
-      setEditSourceUrl(fallbackUrl);
-      setImageState({
-        url: fallbackUrl,
+      console.error("Image edit failed:", error);
+      setImageState((prev) => ({
+        ...prev,
         loading: false,
-        originalPrompt: nextPrompt,
-      });
+        error: "Image edit failed. Check your API configuration and try again.",
+      }));
     }
   };
 
-  const handleGenerateImage = () => {
-    const nextPrompt = prompt.trim();
+  const requestGenerateVideo = async (nextPrompt: string) => {
+    setVideoState((prev) => ({
+      ...prev,
+      loading: true,
+      error: null,
+      progress: 0,
+    }));
+
+    try {
+      // Step 1: Initiate video generation
+      const initResponse = await fetch("/api/generate-video", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+        },
+        body: JSON.stringify({
+          prompt: nextPrompt,
+          settings: videoSettings,
+        }),
+      });
+
+      if (!initResponse.ok) {
+        const errorData = await initResponse.json().catch(() => null);
+        throw new Error(
+          errorData?.error || "Failed to initiate video generation",
+        );
+      }
+
+      const initData = await initResponse.json();
+      const videoId = initData.id;
+
+      if (!videoId) {
+        throw new Error("No video ID returned");
+      }
+
+      // Step 2: Poll for completion on client-side
+      let status = initData.status;
+      let progress = initData.progress || 0;
+      const maxAttempts = 60; // Up to 5 minutes at 5s intervals
+      let attempts = 0;
+
+      while (status !== "completed" && attempts < maxAttempts) {
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+        attempts++;
+
+        const statusResponse = await fetch(`/api/video/${videoId}`, {
+          headers: {
+            ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+          },
+        });
+
+        if (!statusResponse.ok) {
+          setVideoState((prev) => ({ ...prev, progress: 0 })); // Reset progress on error
+          continue;
+        }
+
+        const statusData = await statusResponse.json();
+        status = statusData.status;
+        progress = statusData.progress || progress; // Update progress, keep previous if not available
+
+        setVideoState((prev) => ({ ...prev, progress }));
+
+        if (status === "failed") {
+          throw new Error("Video generation failed during processing");
+        }
+      }
+
+      if (status !== "completed") {
+        throw new Error("Video generation timed out");
+      }
+
+      // Step 3: Get final content URL
+      const contentResponse = await fetch(`/api/video/${videoId}/content`, {
+        headers: {
+          ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+        },
+      });
+
+      if (!contentResponse.ok) {
+        throw new Error("Failed to retrieve video content URL");
+      }
+
+      const contentData = await contentResponse.json();
+      const videoUrl = contentData.url;
+
+      if (!videoUrl) {
+        throw new Error("No video URL returned");
+      }
+
+      setVideoState({
+        url: videoUrl,
+        loading: false,
+        originalPrompt: nextPrompt,
+        error: null,
+        progress: 100, // Set to 100% on success
+      });
+    } catch (error) {
+      console.error("Video generation failed:", error);
+      setVideoState((prev) => ({
+        ...prev,
+        loading: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Video generation failed. Check your API configuration and try again.",
+        progress: 0, // Reset progress on error
+      }));
+    }
+  };
+
+  const handleSelectTool = (tool: MediaTool) => {
+    setActiveTool(tool);
+    setActiveTemplate(null);
+  };
+
+  const handleSelectTemplate = (
+    tool: MediaTool,
+    templateId: string,
+    prompt: string,
+  ) => {
+    setActiveTool(tool);
+    setActiveTemplate(templateId);
+    if (tool === "image") {
+      setImagePrompt(prompt);
+    } else {
+      setVideoPrompt(prompt);
+    }
+  };
+
+  const handleGenerate = () => {
+    if (activeTool === "video") {
+      const nextPrompt = videoPrompt.trim();
+      if (!nextPrompt) return;
+
+      void requestGenerateVideo(nextPrompt);
+      return;
+    }
+
+    const nextPrompt = imagePrompt.trim();
     if (!nextPrompt) return;
 
     if (editSourceUrl) {
@@ -200,6 +344,13 @@ export default function AIImageGenerator() {
   };
 
   const handleRegenerate = () => {
+    if (activeTool === "video") {
+      if (!videoState.originalPrompt.trim()) return;
+
+      void requestGenerateVideo(videoState.originalPrompt);
+      return;
+    }
+
     if (!imageState.originalPrompt.trim()) return;
 
     if (editSourceUrl) {
@@ -211,7 +362,7 @@ export default function AIImageGenerator() {
   };
 
   const handleModify = () => {
-    setPrompt("");
+    setImagePrompt("");
     if (imageState.url) {
       setEditSourceUrl(imageState.url);
     }
@@ -219,15 +370,16 @@ export default function AIImageGenerator() {
   };
 
   const handleDownload = async () => {
-    if (!imageState.url) return;
+    const mediaState = activeTool === "video" ? videoState : imageState;
+    if (!mediaState.url) return;
 
     try {
-      const response = await fetch(imageState.url);
+      const response = await fetch(mediaState.url);
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = `ai-image-${Date.now()}.png`;
+      anchor.download = `${activeTool}-${Date.now()}.${activeTool === "video" ? "mp4" : "png"}`;
       document.body.appendChild(anchor);
       anchor.click();
       window.URL.revokeObjectURL(url);
@@ -247,215 +399,216 @@ export default function AIImageGenerator() {
       const result = loadEvent.target?.result;
       if (typeof result !== "string") return;
 
-      setPrompt("");
+      setImagePrompt("");
       setEditSourceUrl(result);
       setImageState({
         url: result,
         loading: false,
         originalPrompt: "",
+        error: null,
       });
+      setActiveTool("image");
     };
 
     reader.readAsDataURL(file);
     event.target.value = "";
   };
 
-  const showPreview = imageState.loading || Boolean(imageState.url);
-  const primaryActionLabel = editSourceUrl ? "Edit Image" : "Generate Image";
-  const loadingLabel = editSourceUrl ? "Editing..." : "Generating...";
-  const previewLabel = editSourceUrl ? "Editing..." : "Generating...";
+  const currentPrompt = activeTool === "video" ? videoPrompt : imagePrompt;
+  const currentState = activeTool === "video" ? videoState : imageState;
+  const showPreview = currentState.loading || Boolean(currentState.url);
+  const isVideoTool = activeTool === "video";
+  const primaryActionLabel = isVideoTool
+    ? "Generate Video"
+    : editSourceUrl
+      ? "Edit Image"
+      : "Generate Image";
+  const loadingLabel = isVideoTool
+    ? "Generating video..."
+    : editSourceUrl
+      ? "Editing image..."
+      : "Generating image...";
+  const title = isVideoTool ? "Generate videos" : "Generate and edit images";
 
   return (
-    <div className="relative min-h-screen overflow-hidden  px-4 py-6 text-slate-950 sm:px-6 lg:px-8">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-72 " />
+    <div className="min-h-screen bg-white text-slate-900">
+      <div className="flex min-h-screen flex-col lg:flex-row">
+        <Sidebar
+          activeTool={activeTool}
+          activeTemplate={activeTemplate}
+          onSelectTool={handleSelectTool}
+          onSelectTemplate={handleSelectTemplate}
+        />
 
-      <div className="relative mx-auto flex min-h-screen w-full max-w-4xl flex-col justify-center">
-        <div className="mb-8 flex flex-col items-center justify-center">
-          <h1 className="mt-3 text-4xl font-semibold tracking-tight sm:text-5xl text-center">
-            Generate and edit images
-          </h1>
-        </div>
+        <div className="flex flex-1 flex-col lg:ml-64">
+          <Header apiKey={apiKey} setApiKey={handleApiKeyChange} />
 
-        <div className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur sm:p-6">
-          <div className="flex gap-3">
-            <textarea
-              value={prompt}
-              onChange={(event) => setPrompt(event.target.value)}
-              placeholder={
-                editSourceUrl
-                  ? "Describe the change…"
-                  : "Describe the image you want to create…"
-              }
-              className="h-28 flex-1 resize-none rounded-2xl border border-slate-300 bg-white p-4 text-base text-slate-950 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
-            />
-            <div className="flex flex-col gap-2">
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="flex h-28 w-24 items-center justify-center rounded-2xl border border-slate-300 bg-white transition hover:border-slate-400 hover:bg-slate-50"
-                title="Upload image"
-              >
-                <Upload size={22} className="text-slate-900" />
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleFileUpload}
-                className="hidden"
-              />
-            </div>
-          </div>
-
-          <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-            <button
-              type="button"
-              onClick={handleGenerateImage}
-              disabled={!prompt.trim() || imageState.loading}
-              className="inline-flex flex-1 items-center justify-center rounded-full bg-slate-950 px-5 py-3 font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
-            >
-              {imageState.loading ? loadingLabel : primaryActionLabel}
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsSettingsOpen(true)}
-              aria-haspopup="dialog"
-              className="inline-flex items-center gap-2 self-start rounded-full border border-slate-300 bg-white px-5 py-3 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50"
-            >
-              <Settings2 size={16} />
-              Settings
-            </button>
-          </div>
-        </div>
-
-        {showPreview && (
-          <div className="mt-6 rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur sm:p-6">
-            {imageState.loading ? (
-              <div className="flex flex-col items-center justify-center gap-4 py-14 text-center">
-                <div className="h-12 w-12 animate-spin rounded-full border-4 border-slate-200 border-t-slate-950" />
-                <p className="text-sm text-slate-600">{previewLabel}</p>
+          <main className="flex-1 px-4 py-8 sm:px-6 lg:px-12">
+            <div className="mx-auto flex w-full max-w-4xl flex-col">
+              <div className="mb-8">
+                <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+                  {title}
+                </h1>
               </div>
-            ) : (
-              <>
-                <div className="mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
-                  <img
-                    src={imageState.url ?? ""}
-                    alt="Generated image"
-                    className="h-auto w-full object-cover"
+
+              <div className="rounded-lg border border-slate-200 bg-white p-4">
+                <div className="flex gap-4">
+                  <textarea
+                    value={currentPrompt}
+                    onChange={(event) =>
+                      isVideoTool
+                        ? setVideoPrompt(event.target.value)
+                        : setImagePrompt(event.target.value)
+                    }
+                    placeholder={
+                      isVideoTool
+                        ? "Describe the video you want to create…"
+                        : editSourceUrl
+                          ? "Describe the change…"
+                          : "Describe the image you want to create…"
+                    }
+                    className="h-24 flex-1 resize-none bg-transparent text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
                   />
+                  {!isVideoTool && (
+                    <div className="flex flex-col gap-2">
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="flex h-24 w-20 items-center justify-center rounded-md border border-dashed border-slate-300 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-700"
+                        title="Upload image"
+                      >
+                        <Upload size={20} />
+                      </button>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileUpload}
+                        className="hidden"
+                      />
+                    </div>
+                  )}
                 </div>
 
-                <div className="grid gap-3 sm:grid-cols-3">
+                {currentState.error && (
+                  <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+                    {currentState.error}
+                  </p>
+                )}
+
+                <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4">
                   <button
                     type="button"
-                    onClick={handleDownload}
-                    className="inline-flex items-center justify-center gap-2 rounded-full bg-slate-950 px-4 py-3 font-medium text-white transition hover:bg-slate-800"
+                    onClick={() => setIsSettingsOpen(true)}
+                    aria-haspopup="dialog"
+                    className="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 hover:text-slate-900"
                   >
-                    <Download size={18} />
-                    Download
+                    <Settings2 size={14} />
+                    Settings
                   </button>
                   <button
                     type="button"
-                    onClick={handleModify}
-                    className="inline-flex items-center justify-center gap-2 rounded-full bg-slate-950 px-4 py-3 font-medium text-white transition hover:bg-slate-800"
+                    onClick={handleGenerate}
+                    disabled={!currentPrompt.trim() || currentState.loading}
+                    className="inline-flex items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
                   >
-                    <Edit2 size={18} />
-                    Modify
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleRegenerate}
-                    className="inline-flex items-center justify-center gap-2 rounded-full bg-slate-950 px-4 py-3 font-medium text-white transition hover:bg-slate-800"
-                  >
-                    <RefreshCw size={18} />
-                    Regenerate
+                    {currentState.loading ? loadingLabel : primaryActionLabel}
                   </button>
                 </div>
-              </>
-            )}
-          </div>
-        )}
+              </div>
+
+              {showPreview && (
+                <div className="mt-6 rounded-lg border border-slate-200 bg-white p-4">
+                  {currentState.loading ? (
+                    <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+                      {isVideoTool ? (
+                        <div className="w-full px-4">
+                          <p className="mb-2 text-sm text-slate-500">
+                            Generating video...
+                          </p>
+                          <div className="h-2 w-full rounded-full bg-slate-200">
+                            <div
+                              className="h-full rounded-full bg-slate-900 transition-all duration-300 ease-out"
+                              style={{ width: `${currentState.progress}%` }}
+                            ></div>
+                          </div>
+                          <p className="mt-2 text-xs text-slate-500">
+                            {currentState?.progress?.toFixed(0)}%
+                          </p>
+                        </div>
+                      ) : (
+                        <>
+                          <RefreshCw className="h-6 w-6 animate-spin text-slate-400" />
+                          <p className="text-sm text-slate-500">
+                            {loadingLabel}
+                          </p>
+                        </>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      <div className="mb-4 overflow-hidden rounded-md border border-slate-200 bg-slate-50">
+                        {isVideoTool ? (
+                          <video
+                            src={currentState.url ?? ""}
+                            controls
+                            className="aspect-video w-full bg-black object-contain"
+                          />
+                        ) : (
+                          <img
+                            src={currentState.url ?? ""}
+                            alt="Generated media"
+                            className="h-auto w-full object-cover"
+                          />
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={handleDownload}
+                          className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 hover:text-slate-900"
+                        >
+                          <Download size={14} />
+                          Download
+                        </button>
+                        {!isVideoTool && (
+                          <button
+                            type="button"
+                            onClick={handleModify}
+                            className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 hover:text-slate-900"
+                          >
+                            <Edit2 size={14} />
+                            Modify
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={handleRegenerate}
+                          className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 hover:text-slate-900"
+                        >
+                          <RefreshCw size={14} />
+                          Regenerate
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          </main>
+        </div>
       </div>
 
-      {isSettingsOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-4 py-6 backdrop-blur-sm"
-          onClick={() => setIsSettingsOpen(false)}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="settings-title"
-            className="w-full max-w-4xl overflow-hidden rounded-3xl border border-white/20 bg-white shadow-[0_30px_90px_rgba(15,23,42,0.35)]"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
-              <div>
-                <h2
-                  id="settings-title"
-                  className="mt-2 text-2xl font-semibold text-slate-950"
-                >
-                  Settings
-                </h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsSettingsOpen(false)}
-                aria-label="Close settings"
-                className="inline-flex size-10 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-600 transition hover:bg-slate-100"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="grid gap-5 px-6 py-6">
-              <SelectField
-                label="Model"
-                options={IMAGE_MODELS}
-                value={settings.model}
-                onChange={(value) =>
-                  setSettings((prev) => ({
-                    ...prev,
-                    model: value,
-                  }))
-                }
-              />
-              <SelectField
-                label="Size"
-                options={IMAGE_SIZES}
-                value={settings.size}
-                onChange={(value) =>
-                  setSettings((prev) => ({
-                    ...prev,
-                    size: value,
-                  }))
-                }
-              />
-              <SelectField
-                label="Quality"
-                options={IMAGE_QUALITIES}
-                value={settings.quality}
-                onChange={(value) =>
-                  setSettings((prev) => ({
-                    ...prev,
-                    quality: value,
-                  }))
-                }
-              />
-            </div>
-
-            <div className="flex justify-end border-t border-slate-200 px-6 py-5">
-              <button
-                type="button"
-                onClick={() => setIsSettingsOpen(false)}
-                className="inline-flex items-center justify-center rounded-full bg-slate-950 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        isVideoTool={isVideoTool}
+        videoSettings={videoSettings}
+        setVideoSettings={setVideoSettings}
+        imageSettings={imageSettings}
+        setImageSettings={setImageSettings}
+      />
     </div>
   );
 }
