@@ -53,12 +53,8 @@ export const IMAGE_QUALITIES = [
 
 export const VIDEO_MODELS = [
   {
-    value: "video-1",
-    label: "Video 1",
-  },
-  {
-    value: "video-1-fast",
-    label: "Video 1 Fast",
+    value: "sora-2",
+    label: "sora-2",
   },
 ] as const satisfies readonly VideoSettingOption[];
 
@@ -79,12 +75,12 @@ export const VIDEO_SIZES = [
 
 export const VIDEO_DURATIONS = [
   {
-    value: "5",
-    label: "5 seconds",
+    value: "8",
+    label: "8 seconds",
   },
   {
-    value: "10",
-    label: "10 seconds",
+    value: "12",
+    label: "12 seconds",
   },
 ] as const satisfies readonly VideoSettingOption[];
 
@@ -114,9 +110,9 @@ export const DEFAULT_IMAGE_SETTINGS = {
 } as const satisfies ImageGenerationSettings;
 
 export const DEFAULT_VIDEO_SETTINGS = {
-  model: "video-1",
+  model: "sora-2",
   size: "1280x720",
-  duration: "5",
+  duration: "8",
 } as const satisfies VideoGenerationSettings;
 
 function isOptionValue<T extends readonly ImageSettingOption[]>(

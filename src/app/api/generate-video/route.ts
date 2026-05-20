@@ -36,8 +36,8 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({
         model: "sora-2",
         prompt,
-        // size: settings.size,
-        seconds: 8,
+        size: settings.size,
+        seconds: settings.duration,
       }),
     });
 
