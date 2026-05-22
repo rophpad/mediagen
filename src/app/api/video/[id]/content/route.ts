@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { readResponseError } from "@/lib/image-api";
+import { createLogger, createRequestId, serializeError } from "@/lib/logger";
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const requestId = createRequestId();
+  const logger = createLogger("api.video-content", { requestId });
+
   try {
     const resolvedParams = await params;
     const authHeader = request.headers.get("authorization");
@@ -25,8 +31,19 @@ export async function GET(
     );
 
     if (!response.ok) {
+      const upstreamError = await readResponseError(response);
+      logger.error("Upstream video content request failed", {
+        status: response.status,
+        statusText: response.statusText,
+        videoId: resolvedParams.id,
+        upstreamError,
+      });
       return NextResponse.json(
-        { error: "Failed to retrieve video content URL" },
+        {
+          error: "Failed to retrieve video content URL",
+          requestId,
+          details: upstreamError,
+        },
         { status: response.status },
       );
     }
@@ -34,9 +51,13 @@ export async function GET(
     const contentData = await response.json();
     return NextResponse.json(contentData);
   } catch (error) {
-    console.error("Server Error:", error);
+    logger.error("Video content route failed", serializeError(error));
     return NextResponse.json(
-      { error: "Internal server error" },
+      {
+        error: "Internal server error",
+        requestId,
+        details: serializeError(error),
+      },
       { status: 500 },
     );
   }

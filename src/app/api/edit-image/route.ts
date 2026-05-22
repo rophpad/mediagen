@@ -1,92 +1,84 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { extractImageUrl, getImageApiUrl } from "@/lib/image-api";
+import {
+  extractImageUrl,
+  getFluxSteps,
+  getImageApiUrl,
+  isFluxModel,
+  parseImageSize,
+  readResponseError,
+} from "@/lib/image-api";
 import { normalizeImageSettings } from "@/lib/image-settings";
-
-async function fileFromUrl(url: string) {
-  const response = await fetch(url);
-
-  if (!response.ok) {
-    throw new Error("Unable to load image source");
-  }
-
-  const blob = await response.blob();
-  const contentType =
-    response.headers.get("content-type") || blob.type || "image/png";
-
-  return new File([blob], "image.png", {
-    type: contentType,
-  });
-}
+import { createLogger, createRequestId, serializeError } from "@/lib/logger";
 
 export async function POST(request: NextRequest) {
+  const requestId = createRequestId();
+  const logger = createLogger("api.edit-image", { requestId });
+
   try {
     const authHeader = request.headers.get("authorization");
     const apiKey = authHeader
       ? authHeader.replace("Bearer ", "").trim()
       : process.env.API_KEY;
 
-    const formData = await request.formData();
+    const payload = await request.json();
+    const prompt = typeof payload?.prompt === "string" ? payload.prompt : "";
+    const image =
+      typeof payload?.image === "string" ? payload.image.trim() : "";
+    const settings = normalizeImageSettings(payload?.settings ?? payload);
 
-    const promptValue = formData.get("prompt");
-    const prompt = typeof promptValue === "string" ? promptValue.trim() : "";
-
-    if (!prompt) {
+    if (!prompt.trim()) {
       return NextResponse.json(
         { error: "Prompt is required" },
         { status: 400 },
       );
     }
 
-    const settings = normalizeImageSettings({
-      model: formData.get("model"),
-      size: formData.get("size"),
-      quality: formData.get("quality"),
-    });
-
-    const imageValue = formData.get("image");
-    const imageUrlValue = formData.get("imageUrl");
-
-    let imageFile: File | null = null;
-
-    if (imageValue instanceof File && imageValue.size > 0) {
-      imageFile = imageValue;
-    } else if (typeof imageUrlValue === "string" && imageUrlValue.trim()) {
-      imageFile = await fileFromUrl(imageUrlValue.trim());
-    }
-
-    if (!imageFile) {
+    if (!image) {
       return NextResponse.json({ error: "Image is required" }, { status: 400 });
     }
 
-    const upstreamFormData = new FormData();
-    upstreamFormData.append("model", settings.model);
-    upstreamFormData.append("prompt", prompt);
-    upstreamFormData.append("size", settings.size);
-
-    const qualityValue = formData.get("quality");
-    if (typeof qualityValue === "string" && qualityValue.trim()) {
-      upstreamFormData.append("quality", settings.quality);
-    }
-
-    upstreamFormData.append("image", imageFile, imageFile.name);
-
-    console.log(upstreamFormData)
+    const requestBody = isFluxModel(settings.model)
+      ? {
+          prompt: prompt.trim(),
+          ...parseImageSize(settings.size),
+          steps: getFluxSteps(),
+          image,
+        }
+      : {
+          model: settings.model,
+          prompt: prompt.trim(),
+          size: settings.size,
+          image,
+          quality: settings.quality,
+        };
 
     const response = await fetch(getImageApiUrl("edit", settings.model), {
       method: "POST",
       headers: {
+        "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
       },
-      body: upstreamFormData,
+      body: JSON.stringify(requestBody),
     });
-    console.log(response)
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("API Error:", errorText);
+      const upstreamError = await readResponseError(response);
+      logger.error("Upstream image edit failed", {
+        status: response.status,
+        statusText: response.statusText,
+        model: settings.model,
+        size: settings.size,
+        quality: settings.quality,
+        hasImage: Boolean(image),
+        upstreamError,
+      });
       return NextResponse.json(
-        { error: "Failed to edit image" },
+        {
+          error: "Failed to edit image",
+          requestId,
+          details: upstreamError,
+        },
         { status: 500 },
       );
     }
@@ -95,9 +87,12 @@ export async function POST(request: NextRequest) {
     const imageUrl = extractImageUrl(data);
 
     if (!imageUrl) {
-      console.error("No image URL in response:", data);
+      logger.error("Image edit response did not include a URL", {
+        model: settings.model,
+        responseData: data,
+      });
       return NextResponse.json(
-        { error: "No image URL returned" },
+        { error: "No image URL returned", requestId, details: data },
         { status: 500 },
       );
     }
@@ -106,9 +101,13 @@ export async function POST(request: NextRequest) {
       url: imageUrl,
     });
   } catch (error) {
-    console.error("Server Error:", error);
+    logger.error("Image edit route failed", serializeError(error));
     return NextResponse.json(
-      { error: "Internal server error" },
+      {
+        error: "Internal server error",
+        requestId,
+        details: serializeError(error),
+      },
       { status: 500 },
     );
   }

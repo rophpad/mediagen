@@ -105,7 +105,7 @@ export interface VideoGenerationSettings {
 
 export const DEFAULT_IMAGE_SETTINGS = {
   model: "gpt-image-2",
-  size: "1024x1024",
+  size: "1536x1024",
   quality: "high",
 } as const satisfies ImageGenerationSettings;
 

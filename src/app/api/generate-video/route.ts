@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { extractMediaUrl, getImageApiUrl } from "@/lib/image-api";
+import { getImageApiUrl, readResponseError } from "@/lib/image-api";
 import { normalizeVideoSettings } from "@/lib/image-settings";
+import { createLogger, createRequestId, serializeError } from "@/lib/logger";
 
 export async function POST(request: NextRequest) {
+  const requestId = createRequestId();
+  const logger = createLogger("api.generate-video", { requestId });
+
   try {
     const authHeader = request.headers.get("authorization");
     const apiKey = authHeader
@@ -13,6 +17,8 @@ export async function POST(request: NextRequest) {
     const payload = await request.json();
     const prompt =
       typeof payload?.prompt === "string" ? payload.prompt.trim() : "";
+    const image =
+      typeof payload?.image === "string" ? payload.image.trim() : "";
     const settings = normalizeVideoSettings(payload?.settings ?? payload);
 
     if (!prompt) {
@@ -22,42 +28,55 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const baseUrl =
-      process.env.IMAGE_API_BASE_URL?.replace(/\/$/, "") ||
-      "https://build.lewisnote.com";
-
-    // Step 1: Initiate video generation
-    const response = await fetch(`${baseUrl}/v1/videos/generations`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
+    const response = await fetch(
+      getImageApiUrl("video-generation", settings.model),
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: settings.model,
+          prompt,
+          size: settings.size,
+          seconds: settings.duration,
+          ...(image ? { image } : {}),
+        }),
       },
-      body: JSON.stringify({
-        model: "sora-2",
-        prompt,
-        size: settings.size,
-        seconds: settings.duration,
-      }),
-    });
+    );
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("API Error on create:", errorText);
+      const upstreamError = await readResponseError(response);
+      logger.error("Upstream video generation failed", {
+        status: response.status,
+        statusText: response.statusText,
+        model: settings.model,
+        size: settings.size,
+        duration: settings.duration,
+        hasImage: Boolean(image),
+        upstreamError,
+      });
       return NextResponse.json(
-        { error: "Failed to initiate video generation" },
+        {
+          error: "Failed to initiate video generation",
+          requestId,
+          details: upstreamError,
+        },
         { status: 500 },
       );
     }
 
-    console.log(response);
-
     const initialData = await response.json();
     return NextResponse.json(initialData); // Returns { id: "video_xyz789", status: "processing" }
   } catch (error) {
-    console.error("Server Error:", error);
+    logger.error("Video generation route failed", serializeError(error));
     return NextResponse.json(
-      { error: "Internal server error" },
+      {
+        error: "Internal server error",
+        requestId,
+        details: serializeError(error),
+      },
       { status: 500 },
     );
   }

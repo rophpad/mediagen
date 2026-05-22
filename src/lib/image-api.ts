@@ -5,14 +5,17 @@ export type ImageApiGoal = "generation" | "edit" | "video-generation";
 type ImageApiEndpointResolver = string | ((model: string) => string);
 
 const IMAGE_API_ENDPOINT_REGISTRY = {
-  generation: (model: string) =>
-    isFluxModel(model) ? "v1/images/flux" : "v1/images/generations",
-  edit: "v1/images/edits",
+  generation: getImageEndpoint,
+  edit: getImageEndpoint,
   "video-generation": "v1/videos/generations",
 } as const satisfies Record<ImageApiGoal, ImageApiEndpointResolver>;
 
 export function isFluxModel(model: string) {
   return model.toLowerCase().startsWith("flux");
+}
+
+function getImageEndpoint(model: string) {
+  return isFluxModel(model) ? "v1/images/flux" : "v1/images";
 }
 
 export function getImageApiUrl(goal: ImageApiGoal, model: string) {
@@ -82,6 +85,18 @@ export function parseImageSize(size: ImageSize) {
   }
 
   return { width, height };
+}
+
+export async function readResponseError(response: Response) {
+  const contentType = response.headers.get("content-type") ?? "";
+
+  if (contentType.includes("application/json")) {
+    return response.json().catch(() => null);
+  }
+
+  const text = await response.text().catch(() => "");
+
+  return text || null;
 }
 
 function firstString(...values: unknown[]) {

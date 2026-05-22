@@ -1,5 +1,5 @@
 import MediaGeneratorPage from "@/components/MediaGeneratorPage";
 
-export default function HomePage() {
+export default function ImagePage() {
   return <MediaGeneratorPage initialTool="image" />;
 }
