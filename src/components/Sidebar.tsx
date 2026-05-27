@@ -6,9 +6,10 @@ import {
   Palette,
   ShoppingBag,
   Smartphone,
+  Volume2,
 } from "lucide-react";
 
-export type MediaTool = "image" | "video";
+export type MediaTool = "image" | "video" | "audio";
 
 export const IMAGE_TEMPLATES = [
   {
@@ -105,6 +106,18 @@ export function Sidebar({
             >
               <Film size={16} />
               Video generation
+            </button>
+            <button
+              type="button"
+              onClick={() => onSelectTool("audio")}
+              className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                activeTool === "audio" && !activeTemplate
+                  ? "bg-slate-100 text-slate-900"
+                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+              }`}
+            >
+              <Volume2 size={16} />
+              Audio generation
             </button>
           </nav>
         </div>

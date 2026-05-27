@@ -1,5 +1,15 @@
-import MediaGeneratorPage from "@/components/MediaGeneratorPage";
+import { IMAGE_TEMPLATES } from "@/components/Sidebar";
+import { ImageGenerator } from "@/components/media/ImageGenerator";
+
+const conceptTemplate = IMAGE_TEMPLATES.find(
+  (template) => template.id === "concept",
+);
 
 export default function ConceptArtTemplatePage() {
-  return <MediaGeneratorPage initialTool="image" initialTemplateId="concept" />;
+  return (
+    <ImageGenerator
+      activeTemplate="concept"
+      initialPrompt={conceptTemplate?.prompt ?? ""}
+    />
+  );
 }

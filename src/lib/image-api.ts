@@ -1,6 +1,10 @@
 import type { ImageSize } from "./image-settings";
 
-export type ImageApiGoal = "generation" | "edit" | "video-generation";
+export type ImageApiGoal =
+  | "generation"
+  | "edit"
+  | "video-generation"
+  | "audio-speech";
 
 type ImageApiEndpointResolver = string | ((model: string) => string);
 
@@ -8,6 +12,7 @@ const IMAGE_API_ENDPOINT_REGISTRY = {
   generation: getImageEndpoint,
   edit: getImageEndpoint,
   "video-generation": "v1/videos/generations",
+  "audio-speech": "v1/audio/speech",
 } as const satisfies Record<ImageApiGoal, ImageApiEndpointResolver>;
 
 export function isFluxModel(model: string) {

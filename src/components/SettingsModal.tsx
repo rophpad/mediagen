@@ -1,11 +1,15 @@
 import { X } from "lucide-react";
 import {
+  AUDIO_FORMATS,
+  AUDIO_MODELS,
+  AUDIO_VOICES,
   IMAGE_MODELS,
   IMAGE_QUALITIES,
   IMAGE_SIZES,
   VIDEO_DURATIONS,
   VIDEO_MODELS,
   VIDEO_SIZES,
+  type AudioGenerationSettings,
   type ImageGenerationSettings,
   type VideoGenerationSettings,
 } from "@/lib/image-settings";
@@ -48,21 +52,25 @@ function SelectField<T extends string>({
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  isVideoTool: boolean;
+  activeTool: "image" | "video" | "audio";
   videoSettings: VideoGenerationSettings;
   setVideoSettings: Dispatch<SetStateAction<VideoGenerationSettings>>;
   imageSettings: ImageGenerationSettings;
   setImageSettings: Dispatch<SetStateAction<ImageGenerationSettings>>;
+  audioSettings: AudioGenerationSettings;
+  setAudioSettings: Dispatch<SetStateAction<AudioGenerationSettings>>;
 }
 
 export function SettingsModal({
   isOpen,
   onClose,
-  isVideoTool,
+  activeTool,
   videoSettings,
   setVideoSettings,
   imageSettings,
   setImageSettings,
+  audioSettings,
+  setAudioSettings,
 }: SettingsModalProps) {
   if (!isOpen) return null;
 
@@ -96,7 +104,7 @@ export function SettingsModal({
         </div>
 
         <div className="grid gap-4 px-5 py-5">
-          {isVideoTool ? (
+          {activeTool === "video" ? (
             <>
               <SelectField
                 label="Model"
@@ -128,6 +136,42 @@ export function SettingsModal({
                   setVideoSettings((prev) => ({
                     ...prev,
                     duration: value,
+                  }))
+                }
+              />
+            </>
+          ) : activeTool === "audio" ? (
+            <>
+              <SelectField
+                label="Model"
+                options={AUDIO_MODELS}
+                value={audioSettings.model}
+                onChange={(value) =>
+                  setAudioSettings((prev) => ({
+                    ...prev,
+                    model: value,
+                  }))
+                }
+              />
+              <SelectField
+                label="Voice"
+                options={AUDIO_VOICES}
+                value={audioSettings.voice}
+                onChange={(value) =>
+                  setAudioSettings((prev) => ({
+                    ...prev,
+                    voice: value,
+                  }))
+                }
+              />
+              <SelectField
+                label="Format"
+                options={AUDIO_FORMATS}
+                value={audioSettings.format}
+                onChange={(value) =>
+                  setAudioSettings((prev) => ({
+                    ...prev,
+                    format: value,
                   }))
                 }
               />

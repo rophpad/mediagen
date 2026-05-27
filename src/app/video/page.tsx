@@ -1,5 +1,5 @@
-import MediaGeneratorPage from "@/components/MediaGeneratorPage";
+import { VideoGenerator } from "@/components/media/VideoGenerator";
 
 export default function VideoPage() {
-  return <MediaGeneratorPage initialTool="video" />;
+  return <VideoGenerator />;
 }

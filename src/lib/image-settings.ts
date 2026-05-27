@@ -5,6 +5,7 @@ type MediaSettingOption = {
 
 type ImageSettingOption = MediaSettingOption;
 type VideoSettingOption = MediaSettingOption;
+type AudioSettingOption = MediaSettingOption;
 
 export const IMAGE_MODELS = [
   {
@@ -75,6 +76,10 @@ export const VIDEO_SIZES = [
 
 export const VIDEO_DURATIONS = [
   {
+    value: "4",
+    label: "4 seconds",
+  },
+  {
     value: "8",
     label: "8 seconds",
   },
@@ -84,12 +89,60 @@ export const VIDEO_DURATIONS = [
   },
 ] as const satisfies readonly VideoSettingOption[];
 
+export const AUDIO_MODELS = [
+  {
+    value: "gpt-audio-1.5",
+    label: "GPT Audio 1.5",
+  },
+] as const satisfies readonly AudioSettingOption[];
+
+export const AUDIO_VOICES = [
+  {
+    value: "alloy",
+    label: "Alloy",
+  },
+  {
+    value: "echo",
+    label: "Echo",
+  },
+  {
+    value: "fable",
+    label: "Fable",
+  },
+  {
+    value: "onyx",
+    label: "Onyx",
+  },
+  {
+    value: "nova",
+    label: "Nova",
+  },
+  {
+    value: "shimmer",
+    label: "Shimmer",
+  },
+] as const satisfies readonly AudioSettingOption[];
+
+export const AUDIO_FORMATS = [
+  {
+    value: "mp3",
+    label: "MP3",
+  },
+  {
+    value: "wav",
+    label: "WAV",
+  },
+] as const satisfies readonly AudioSettingOption[];
+
 export type ImageModel = (typeof IMAGE_MODELS)[number]["value"];
 export type ImageSize = (typeof IMAGE_SIZES)[number]["value"];
 export type ImageQuality = (typeof IMAGE_QUALITIES)[number]["value"];
 export type VideoModel = (typeof VIDEO_MODELS)[number]["value"];
 export type VideoSize = (typeof VIDEO_SIZES)[number]["value"];
 export type VideoDuration = (typeof VIDEO_DURATIONS)[number]["value"];
+export type AudioModel = (typeof AUDIO_MODELS)[number]["value"];
+export type AudioVoice = (typeof AUDIO_VOICES)[number]["value"];
+export type AudioFormat = (typeof AUDIO_FORMATS)[number]["value"];
 
 export interface ImageGenerationSettings {
   model: ImageModel;
@@ -103,6 +156,12 @@ export interface VideoGenerationSettings {
   duration: VideoDuration;
 }
 
+export interface AudioGenerationSettings {
+  model: AudioModel;
+  voice: AudioVoice;
+  format: AudioFormat;
+}
+
 export const DEFAULT_IMAGE_SETTINGS = {
   model: "gpt-image-2",
   size: "1536x1024",
@@ -112,8 +171,14 @@ export const DEFAULT_IMAGE_SETTINGS = {
 export const DEFAULT_VIDEO_SETTINGS = {
   model: "sora-2",
   size: "1280x720",
-  duration: "8",
+  duration: "4",
 } as const satisfies VideoGenerationSettings;
+
+export const DEFAULT_AUDIO_SETTINGS = {
+  model: "gpt-audio-1.5",
+  voice: "alloy",
+  format: "mp3",
+} as const satisfies AudioGenerationSettings;
 
 function isOptionValue<T extends readonly ImageSettingOption[]>(
   options: T,
@@ -160,6 +225,27 @@ export function normalizeVideoSettings(
     duration: isOptionValue(VIDEO_DURATIONS, duration)
       ? duration
       : DEFAULT_VIDEO_SETTINGS.duration,
+  };
+}
+
+export function normalizeAudioSettings(
+  input: unknown,
+): AudioGenerationSettings {
+  const candidate = getSettingsCandidate(input);
+  const model = candidate.model;
+  const voice = candidate.voice;
+  const format = candidate.format;
+
+  return {
+    model: isOptionValue(AUDIO_MODELS, model)
+      ? model
+      : DEFAULT_AUDIO_SETTINGS.model,
+    voice: isOptionValue(AUDIO_VOICES, voice)
+      ? voice
+      : DEFAULT_AUDIO_SETTINGS.voice,
+    format: isOptionValue(AUDIO_FORMATS, format)
+      ? format
+      : DEFAULT_AUDIO_SETTINGS.format,
   };
 }
 

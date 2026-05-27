@@ -1,5 +1,10 @@
-import MediaGeneratorPage from "@/components/MediaGeneratorPage";
+import { IMAGE_TEMPLATES } from "@/components/Sidebar";
+import { CarouselGenerator } from "@/components/media/CarouselGenerator";
+
+const carouselTemplate = IMAGE_TEMPLATES.find(
+  (template) => template.id === "carousel",
+);
 
 export default function CarouselTemplatePage() {
-  return <MediaGeneratorPage initialTool="image" initialTemplateId="carousel" />;
+  return <CarouselGenerator initialPrompt={carouselTemplate?.prompt ?? ""} />;
 }
