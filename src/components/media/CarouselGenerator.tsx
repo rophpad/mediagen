@@ -14,8 +14,10 @@ import {
   type MediaState,
 } from "./media-utils";
 import {
+  DEFAULT_AUDIO_SETTINGS,
   DEFAULT_IMAGE_SETTINGS,
   DEFAULT_VIDEO_SETTINGS,
+  type AudioGenerationSettings,
   type ImageGenerationSettings,
   type VideoGenerationSettings,
 } from "@/lib/image-settings";
@@ -48,12 +50,17 @@ interface CarouselResultProps {
   onRegenerate: () => void;
 }
 
-export function CarouselGenerator({ initialPrompt = "" }: CarouselGeneratorProps) {
+export function CarouselGenerator({
+  initialPrompt = "",
+}: CarouselGeneratorProps) {
   const [imageSettings, setImageSettings] = useState<ImageGenerationSettings>(
     DEFAULT_IMAGE_SETTINGS,
   );
   const [videoSettings, setVideoSettings] = useState<VideoGenerationSettings>(
     DEFAULT_VIDEO_SETTINGS,
+  );
+  const [audioSettings, setAudioSettings] = useState<AudioGenerationSettings>(
+    DEFAULT_AUDIO_SETTINGS,
   );
   const [imageState, setImageState] = useState<MediaState>(
     createInitialMediaState,
@@ -66,11 +73,16 @@ export function CarouselGenerator({ initialPrompt = "" }: CarouselGeneratorProps
   const [carouselGlobalStyle, setCarouselGlobalStyle] = useState(
     "Modern minimalist design, consistent brand colors, clean typography, soft background shapes, high contrast readable text.",
   );
-  const [carouselSlides, setCarouselSlides] = useState<CarouselSlideState[]>([]);
+  const [carouselSlides, setCarouselSlides] = useState<CarouselSlideState[]>(
+    [],
+  );
   const [carouselLoading, setCarouselLoading] = useState(false);
   const [carouselError, setCarouselError] = useState<string | null>(null);
 
-  const requestGenerateCarousel = async (apiKey: string, basePrompt: string) => {
+  const requestGenerateCarousel = async (
+    apiKey: string,
+    basePrompt: string,
+  ) => {
     setCarouselLoading(true);
     setCarouselError(null);
     setCarouselSlides([]);
@@ -197,6 +209,8 @@ export function CarouselGenerator({ initialPrompt = "" }: CarouselGeneratorProps
       setImageSettings={setImageSettings}
       videoSettings={videoSettings}
       setVideoSettings={setVideoSettings}
+      audioSettings={audioSettings}
+      setAudioSettings={setAudioSettings}
     >
       {(apiKey, openSettings) => {
         const showPreview = carouselLoading || carouselSlides.length > 0;
