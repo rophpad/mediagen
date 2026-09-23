@@ -1,36 +1,39 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Mediagen
 
-## Getting Started
+Generate and modify media with AI — images, audio, and video from a single web app.
 
-First, run the development server:
+Live: [aimediagen.vercel.app](https://aimediagen.vercel.app)
+
+## What it does
+
+- **Image generation & editing** — text-to-image and image-to-image editing
+- **Video generation** — create videos from a prompt, optionally starting from an image
+- **Audio generation** — text-to-speech narration
+- **Media templates** — dedicated flows for concept art, product shots, short ads, and UGC-style videos
+- **Carousel builder** — generate carousel content
+
+## Tech stack
+
+- [Next.js](https://nextjs.org) (App Router) + TypeScript
+- Server-side AI generation via API routes that proxy a provider with the model key
+- [shadcn/ui](https://ui.shadcn.com)-style components with Tailwind CSS
+
+## Getting started
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000). The generation API routes expect an `Authorization: Bearer <api-key>` header, so supply a valid model provider key for image, video, and audio calls to work.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Project structure
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `src/app/api/generate-image` — image generation and editing
+- `src/app/api/generate-video` — video generation
+- `src/app/api/generate-audio` — text-to-speech
+- `src/app/image`, `src/app/video`, `src/app/audio`, `src/app/carousel`, `src/app/concept-art`, `src/app/product`, `src/app/short-ad`, `src/app/ugc-video` — corresponding UI flows
 
-## Learn More
+## Status
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Active project. Default template README replaced on 2026-09; feature set reflects the current codebase.
